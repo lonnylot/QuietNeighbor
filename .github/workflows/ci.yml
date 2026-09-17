@@ -15,6 +15,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Show Xcode
+        run: xcodebuild -version && xcode-select -p
+
       - name: Resolve Xcode project
         id: xcode
         run: |
@@ -34,12 +37,11 @@ jobs:
             echo "project_path=$project" >> "$GITHUB_OUTPUT"
             list_args=(-project "$project")
           else
-            echo "No Xcode project or workspace found; skipping build."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::No Xcode project or workspace found."
+            exit 1
           fi
 
-          scheme=$(xcodebuild -list "${list_args[@]}" 2>/dev/null | awk '
+          scheme=$(xcodebuild -list "${list_args[@]}" | awk '
             /^[[:space:]]*Schemes:/ { in_schemes=1; next }
             in_schemes && /^[[:space:]]*$/ { exit }
             in_schemes && /QuietNeighbor/ { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print; found=1; exit }
@@ -53,17 +55,14 @@ jobs:
           ')
 
           if [ -z "$scheme" ]; then
-            echo "Could not resolve an Xcode scheme; skipping build."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::Could not resolve an Xcode scheme."
+            exit 1
           fi
 
           echo "Using scheme: $scheme"
           echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
-          echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: Build
-        if: steps.xcode.outputs.skip != 'true'
         run: |
           set -euo pipefail
           xcodebuild \
@@ -71,6 +70,9 @@ jobs:
             -scheme "${{ steps.xcode.outputs.scheme }}" \
             -destination 'platform=macOS' \
             -configuration Debug \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM= \
             build
