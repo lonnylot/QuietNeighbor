@@ -14,6 +14,7 @@
 		A0A100000000000000000009 /* CoreAudioSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A10000000000000000000A /* CoreAudioSupport.swift */; };
 		A0A10000000000000000000B /* AudioProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A10000000000000000000C /* AudioProcessMonitor.swift */; };
 		A0A10000000000000000000D /* AppTapSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A10000000000000000000E /* AppTapSession.swift */; };
+		A0A100000000000000000033 /* TapGain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000034 /* TapGain.swift */; };
 		A0A10000000000000000000F /* MixerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000010 /* MixerEngine.swift */; };
 		A0A100000000000000000011 /* AudioCapturePermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000012 /* AudioCapturePermission.swift */; };
 		A0A100000000000000000013 /* VolumeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000014 /* VolumeStore.swift */; };
@@ -25,6 +26,8 @@
 		B0B100000000000000000004 /* VolumeStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0B100000000000000000002 /* VolumeStoreTests.swift */; };
 		B0B100000000000000000011 /* VolumePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000008 /* VolumePreference.swift */; };
 		B0B100000000000000000012 /* VolumeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000014 /* VolumeStore.swift */; };
+		B0B100000000000000000016 /* TapGain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000034 /* TapGain.swift */; };
+		B0B100000000000000000017 /* TapGainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0B100000000000000000018 /* TapGainTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +39,7 @@
 		A0A10000000000000000000A /* CoreAudioSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreAudioSupport.swift; sourceTree = "<group>"; };
 		A0A10000000000000000000C /* AudioProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioProcessMonitor.swift; sourceTree = "<group>"; };
 		A0A10000000000000000000E /* AppTapSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTapSession.swift; sourceTree = "<group>"; };
+		A0A100000000000000000034 /* TapGain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapGain.swift; sourceTree = "<group>"; };
 		A0A100000000000000000010 /* MixerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixerEngine.swift; sourceTree = "<group>"; };
 		A0A100000000000000000012 /* AudioCapturePermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCapturePermission.swift; sourceTree = "<group>"; };
 		A0A100000000000000000014 /* VolumeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeStore.swift; sourceTree = "<group>"; };
@@ -46,6 +50,7 @@
 		A0A10000000000000000001E /* QuietNeighbor.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QuietNeighbor.entitlements; sourceTree = "<group>"; };
 		B0B100000000000000000001 /* VolumePreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumePreferenceTests.swift; sourceTree = "<group>"; };
 		B0B100000000000000000002 /* VolumeStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeStoreTests.swift; sourceTree = "<group>"; };
+		B0B100000000000000000018 /* TapGainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapGainTests.swift; sourceTree = "<group>"; };
 		B0B100000000000000000006 /* QuietNeighborTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = QuietNeighborTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -115,6 +120,7 @@
 				A0A10000000000000000000A /* CoreAudioSupport.swift */,
 				A0A10000000000000000000C /* AudioProcessMonitor.swift */,
 				A0A10000000000000000000E /* AppTapSession.swift */,
+				A0A100000000000000000034 /* TapGain.swift */,
 				A0A100000000000000000010 /* MixerEngine.swift */,
 				A0A100000000000000000012 /* AudioCapturePermission.swift */,
 			);
@@ -144,6 +150,7 @@
 			children = (
 				B0B100000000000000000001 /* VolumePreferenceTests.swift */,
 				B0B100000000000000000002 /* VolumeStoreTests.swift */,
+				B0B100000000000000000018 /* TapGainTests.swift */,
 			);
 			path = QuietNeighborTests;
 			sourceTree = "<group>";
@@ -250,6 +257,7 @@
 				A0A100000000000000000009 /* CoreAudioSupport.swift in Sources */,
 				A0A10000000000000000000B /* AudioProcessMonitor.swift in Sources */,
 				A0A10000000000000000000D /* AppTapSession.swift in Sources */,
+				A0A100000000000000000033 /* TapGain.swift in Sources */,
 				A0A10000000000000000000F /* MixerEngine.swift in Sources */,
 				A0A100000000000000000011 /* AudioCapturePermission.swift in Sources */,
 				A0A100000000000000000013 /* VolumeStore.swift in Sources */,
@@ -265,8 +273,10 @@
 			files = (
 				B0B100000000000000000011 /* VolumePreference.swift in Sources */,
 				B0B100000000000000000012 /* VolumeStore.swift in Sources */,
+				B0B100000000000000000016 /* TapGain.swift in Sources */,
 				B0B100000000000000000003 /* VolumePreferenceTests.swift in Sources */,
 				B0B100000000000000000004 /* VolumeStoreTests.swift in Sources */,
+				B0B100000000000000000017 /* TapGainTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

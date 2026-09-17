@@ -10,6 +10,29 @@ final class VolumePreferenceTests: XCTestCase {
         let preference = VolumePreference(volume: 0.5, isMuted: false)
         XCTAssertTrue(preference.needsTap)
         XCTAssertEqual(preference.effectiveGain, 0.5)
+        XCTAssertNotEqual(preference.effectiveGain, 0, "50% must be half gain, not mute")
+    }
+
+    func testSliderIsContinuousRelativeGain() {
+        for step in 0...100 {
+            let volume = Double(step) / 100
+            let preference = VolumePreference(volume: volume, isMuted: false)
+            XCTAssertEqual(preference.effectiveGain, volume, accuracy: 0.0001)
+            XCTAssertEqual(
+                TapGain.linear(volume: volume, isMuted: false),
+                Float32(volume),
+                accuracy: 0.0001
+            )
+            if step == 0 {
+                XCTAssertEqual(preference.effectiveGain, 0)
+            } else if step == 100 {
+                XCTAssertEqual(preference.effectiveGain, 1)
+                XCTAssertFalse(preference.needsTap)
+            } else {
+                XCTAssertGreaterThan(preference.effectiveGain, 0)
+                XCTAssertLessThan(preference.effectiveGain, 1)
+            }
+        }
     }
 
     func testMutedNeedsTapEvenAtFullVolume() {
