@@ -11,6 +11,13 @@ struct MixerView: View {
             if mixer.permission != .authorized {
                 permissionBanner
                 Divider()
+            } else if let lastError = mixer.lastError {
+                Text(lastError)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                Divider()
             }
             appList
             Divider()

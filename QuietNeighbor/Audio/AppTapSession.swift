@@ -88,21 +88,25 @@ final class AppTapSession {
     }
 
     func stop() {
-        if let ioProcID {
-            AudioDeviceStop(aggregateID, ioProcID)
-            AudioDeviceDestroyIOProcID(aggregateID, ioProcID)
-            self.ioProcID = nil
-        }
-        if aggregateID.isValid {
-            AudioHardwareDestroyAggregateDevice(aggregateID)
-            aggregateID = .unknown
-        }
-        if tapID.isValid {
-            AudioHardwareDestroyProcessTap(tapID)
-            tapID = .unknown
-        }
+        let proc = ioProcID
+        let aggregate = aggregateID
+        let tap = tapID
+        ioProcID = nil
+        aggregateID = .unknown
+        tapID = .unknown
         tapDescriptionUUID = nil
         isRunning = false
+
+        if let proc, aggregate.isValid {
+            AudioDeviceStop(aggregate, proc)
+            AudioDeviceDestroyIOProcID(aggregate, proc)
+        }
+        if aggregate.isValid {
+            AudioHardwareDestroyAggregateDevice(aggregate)
+        }
+        if tap.isValid {
+            AudioHardwareDestroyProcessTap(tap)
+        }
     }
 
     private func createTap() throws {

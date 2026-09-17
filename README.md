@@ -89,7 +89,7 @@ QuietNeighbor/
 
 ## CI
 
-`.github/workflows/ci.yml` runs `xcodebuild` on `macos-latest` for the QuietNeighbor scheme with signing disabled. The old “skip if no Xcode project” path is gone — the project is required.
+`.github/workflows/ci.yml` runs `xcodebuild` build + `QuietNeighborTests` on `macos-latest` for the QuietNeighbor scheme with signing disabled. The old “skip if no Xcode project” path is gone — the project is required. Tests cover `VolumePreference` / `VolumeStore` only (no live audio).
 
 ## License
 

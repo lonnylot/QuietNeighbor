@@ -17,6 +17,7 @@ final class MixerController: ObservableObject {
     private var lastHeard: [String: Date] = [:]
     private var outputPoller: Timer?
     private var didStart = false
+    private var isRequestingPermission = false
 
     func start() {
         guard !didStart else { return }
@@ -25,9 +26,20 @@ final class MixerController: ObservableObject {
         permission = AudioCapturePermission.status
         refreshOutputDevice()
 
+        engine.setOnSettled { [weak self] in
+            Task { @MainActor in
+                self?.publishApps()
+            }
+        }
+
         monitor.onChange = { [weak self] identities in
             Task { @MainActor in
                 self?.handleIdentities(identities)
+            }
+        }
+        monitor.onOutputDeviceChange = { [weak self] in
+            Task { @MainActor in
+                self?.refreshOutputDevice()
             }
         }
         monitor.start()
@@ -47,11 +59,7 @@ final class MixerController: ObservableObject {
     }
 
     func requestPermission() {
-        Task {
-            permission = await AudioCapturePermission.request()
-            syncEngine()
-            publishApps()
-        }
+        requestPermissionAndRetry()
     }
 
     func setVolume(_ volume: Double, for app: AudioApp) {
@@ -66,21 +74,47 @@ final class MixerController: ObservableObject {
 
     func refresh() {
         permission = AudioCapturePermission.status
+        if permission.allowsTaps {
+            lastError = nil
+        }
         refreshOutputDevice()
         monitor.refresh()
+        syncEngine()
         publishApps()
     }
 
     private func applyChange(for key: String) {
         let preference = store.preference(for: key)
         if preference.needsTap && permission != .authorized {
-            requestPermission()
+            publishApps()
+            requestPermissionAndRetry()
+            return
         }
         if engine.isTapActive(for: key) && preference.needsTap {
             engine.updateGain(for: key, preference: preference)
         }
         syncEngine()
         publishApps()
+    }
+
+    private func requestPermissionAndRetry() {
+        guard !isRequestingPermission else { return }
+        isRequestingPermission = true
+        Task {
+            let status = await AudioCapturePermission.request()
+            permission = status
+            isRequestingPermission = false
+            if status.allowsTaps {
+                lastError = nil
+                syncEngine()
+            } else if status == .denied {
+                lastError = "Audio capture is denied. QuietNeighbor cannot change per-app volume until it is allowed in Privacy settings."
+                engine.stopAll()
+            } else {
+                lastError = "Allow audio capture to apply per-app volume."
+            }
+            publishApps()
+        }
     }
 
     private func handleIdentities(_ identities: [ResolvedAppIdentity]) {
@@ -90,6 +124,7 @@ final class MixerController: ObservableObject {
             lastHeard[identity.persistenceKey] = now
         }
         pruneLastHeard()
+        refreshOutputDevice()
         syncEngine()
         publishApps()
     }
@@ -140,7 +175,7 @@ final class MixerController: ObservableObject {
                 volume: preference.clampedVolume,
                 isMuted: preference.isMuted,
                 tapActive: engine.isTapActive(for: identity.persistenceKey),
-                tapError: engine.error(for: identity.persistenceKey)
+                tapError: rowError(for: identity, preference: preference)
             )
         }
         .sorted { lhs, rhs in
@@ -149,6 +184,24 @@ final class MixerController: ObservableObject {
         }
 
         apps = rows
+    }
+
+    private func rowError(for identity: ResolvedAppIdentity, preference: VolumePreference) -> String? {
+        if let engineError = engine.error(for: identity.persistenceKey) {
+            return engineError
+        }
+        guard preference.needsTap else { return nil }
+        switch permission {
+        case .denied:
+            return "Audio capture is denied."
+        case .notDetermined:
+            return "Grant audio capture to apply this level."
+        case .authorized:
+            if identity.processObjectIDs.isEmpty {
+                return "This app is not producing audio right now."
+            }
+            return nil
+        }
     }
 
     private func pruneLastHeard() {

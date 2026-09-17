@@ -76,3 +76,19 @@ jobs:
             CODE_SIGN_IDENTITY=- \
             DEVELOPMENT_TEAM= \
             build
+
+      - name: Test
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            "${{ steps.xcode.outputs.project_flag }}" "${{ steps.xcode.outputs.project_path }}" \
+            -scheme "${{ steps.xcode.outputs.scheme }}" \
+            -destination 'platform=macOS' \
+            -configuration Debug \
+            -derivedDataPath build \
+            -only-testing:QuietNeighborTests \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM= \
+            test

@@ -13,6 +13,7 @@ final class AudioProcessMonitor: @unchecked Sendable {
     private var lastIdentities: [ResolvedAppIdentity] = []
 
     var onChange: (([ResolvedAppIdentity]) -> Void)?
+    var onOutputDeviceChange: (() -> Void)?
 
     func start() {
         queue.async { [weak self] in
@@ -49,6 +50,7 @@ final class AudioProcessMonitor: @unchecked Sendable {
             self?.scan()
         }
         addListener(.system, kAudioHardwarePropertyDefaultOutputDevice) { [weak self] in
+            self?.onOutputDeviceChange?()
             self?.scan()
         }
     }
