@@ -15,6 +15,7 @@
 		A0A10000000000000000000B /* AudioProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A10000000000000000000C /* AudioProcessMonitor.swift */; };
 		A0A10000000000000000000D /* AppTapSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A10000000000000000000E /* AppTapSession.swift */; };
 		A0A100000000000000000033 /* TapGain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000034 /* TapGain.swift */; };
+		A0A100000000000000000035 /* TapRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000036 /* TapRingBuffer.swift */; };
 		A0A10000000000000000000F /* MixerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000010 /* MixerEngine.swift */; };
 		A0A100000000000000000011 /* AudioCapturePermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000012 /* AudioCapturePermission.swift */; };
 		A0A100000000000000000013 /* VolumeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000014 /* VolumeStore.swift */; };
@@ -31,6 +32,7 @@
 		B0B100000000000000000014 /* MuteAccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0B100000000000000000015 /* MuteAccessibilityTests.swift */; };
 		B0B100000000000000000016 /* TapGain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000034 /* TapGain.swift */; };
 		B0B100000000000000000017 /* TapGainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0B100000000000000000018 /* TapGainTests.swift */; };
+		B0B100000000000000000019 /* TapRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000036 /* TapRingBuffer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +45,7 @@
 		A0A10000000000000000000C /* AudioProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioProcessMonitor.swift; sourceTree = "<group>"; };
 		A0A10000000000000000000E /* AppTapSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTapSession.swift; sourceTree = "<group>"; };
 		A0A100000000000000000034 /* TapGain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapGain.swift; sourceTree = "<group>"; };
+		A0A100000000000000000036 /* TapRingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapRingBuffer.swift; sourceTree = "<group>"; };
 		A0A100000000000000000010 /* MixerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixerEngine.swift; sourceTree = "<group>"; };
 		A0A100000000000000000012 /* AudioCapturePermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCapturePermission.swift; sourceTree = "<group>"; };
 		A0A100000000000000000014 /* VolumeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeStore.swift; sourceTree = "<group>"; };
@@ -126,6 +129,7 @@
 				A0A10000000000000000000C /* AudioProcessMonitor.swift */,
 				A0A10000000000000000000E /* AppTapSession.swift */,
 				A0A100000000000000000034 /* TapGain.swift */,
+				A0A100000000000000000036 /* TapRingBuffer.swift */,
 				A0A100000000000000000010 /* MixerEngine.swift */,
 				A0A100000000000000000012 /* AudioCapturePermission.swift */,
 			);
@@ -265,6 +269,7 @@
 				A0A10000000000000000000B /* AudioProcessMonitor.swift in Sources */,
 				A0A10000000000000000000D /* AppTapSession.swift in Sources */,
 				A0A100000000000000000033 /* TapGain.swift in Sources */,
+				A0A100000000000000000035 /* TapRingBuffer.swift in Sources */,
 				A0A10000000000000000000F /* MixerEngine.swift in Sources */,
 				A0A100000000000000000011 /* AudioCapturePermission.swift in Sources */,
 				A0A100000000000000000013 /* VolumeStore.swift in Sources */,
@@ -282,6 +287,7 @@
 				B0B100000000000000000011 /* VolumePreference.swift in Sources */,
 				B0B100000000000000000012 /* VolumeStore.swift in Sources */,
 				B0B100000000000000000016 /* TapGain.swift in Sources */,
+				B0B100000000000000000019 /* TapRingBuffer.swift in Sources */,
 				B0B100000000000000000013 /* MixerAccessibility.swift in Sources */,
 				B0B100000000000000000003 /* VolumePreferenceTests.swift in Sources */,
 				B0B100000000000000000004 /* VolumeStoreTests.swift in Sources */,

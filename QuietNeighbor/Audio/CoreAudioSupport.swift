@@ -183,6 +183,26 @@ enum SystemAudio {
         return try AudioProperty.read(stream, kAudioStreamPropertyVirtualFormat)
     }
 
+    static func nominalSampleRate(of device: AudioObjectID) throws -> Double {
+        try AudioProperty.read(device, kAudioDevicePropertyNominalSampleRate)
+    }
+
+    static func setNominalSampleRate(_ rate: Double, on device: AudioObjectID) throws {
+        var value = rate
+        var property = AudioProperty.address(kAudioDevicePropertyNominalSampleRate)
+        try AudioProperty.check(
+            AudioObjectSetPropertyData(
+                device,
+                &property,
+                0,
+                nil,
+                UInt32(MemoryLayout<Double>.size),
+                &value
+            ),
+            "set nominal sample rate"
+        )
+    }
+
     static func isDeviceAlive(_ device: AudioObjectID) -> Bool {
         var property = AudioProperty.address(kAudioDevicePropertyDeviceIsAlive)
         var alive: UInt32 = 0
@@ -191,9 +211,8 @@ enum SystemAudio {
         return status == noErr && TapGain.isDeviceAlive(alive)
     }
 
-    /// Stacked tap aggregates can take a beat to come up. Starting IO before
-    /// `DeviceIsAlive` yields empty buffers after `mutedWhenTapped` has
-    /// already silenced the original hardware path.
+    /// Tap-only capture aggregates can take a beat to come up. Starting IO
+    /// before `DeviceIsAlive` yields empty buffers (no error).
     static func waitUntilAlive(
         _ device: AudioObjectID,
         attempts: Int = 25,

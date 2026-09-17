@@ -2,31 +2,24 @@ import CoreAudio
 import Darwin
 import Foundation
 
-/// Linear per-app gain versus system volume, plus the IOProc mix used when a tap
-/// is active. Slider 0...1 is amplitude (50% = half as loud), not a mute gate.
+/// Linear per-app gain versus system volume, plus the capture→playback helpers
+/// used when a tap is active. Slider 0...1 is amplitude (50% = half as loud).
 enum TapGain {
-    /// Relative amplitude written into the IOProc. Mute forces silence; unmute
-    /// uses the saved slider. Values are continuous in 0...1 — never snapped
-    /// to 0/1 except at the endpoints or when muted.
+    /// Relative amplitude. Mute forces silence; unmute uses the saved slider.
     static func linear(volume: Double, isMuted: Bool) -> Float32 {
         if isMuted { return 0 }
         return Float32(min(1, max(0, volume)))
     }
 
-    /// The IOProc command for a stored preference. Slider 0...1 stays
-    /// amplitude; mute is a separate flag. Never treat `volume < 1` as mute.
+    /// The command written into the realtime state. `volume < 1` is never mute.
     static func ioCommand(for preference: VolumePreference) -> (volume: Float, muted: Bool, gain: Float32) {
         let volume = Float(preference.clampedVolume)
         let muted = preference.isMuted
         return (volume, muted, linear(volume: Double(volume), isMuted: muted))
     }
 
-    /// UID the aggregate tap list must reference.
-    ///
-    /// Working playback mixers attach with the UUID assigned on
-    /// `CATapDescription`. Preferring HAL's `kAudioTapPropertyUID` can miss
-    /// the tap (case / format), which leaves `mutedWhenTapped` on and the
-    /// IOProc silent — the under-100% "mute" bug.
+    /// UID the aggregate tap list must reference. Prefer the UUID assigned on
+    /// `CATapDescription`; HAL's property is fallback only.
     static func aggregateTapUID(assigned: String?, hardware: String?) -> String? {
         if let assigned, !assigned.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return assigned
@@ -37,18 +30,20 @@ enum TapGain {
         return nil
     }
 
-    /// Private stacked aggregate that clocks to the real output and plays
-    /// IOProc samples through it. A non-stacked private aggregate captures
-    /// the tap but does not render to the speakers.
-    struct AggregateSpec: Equatable {
+    /// Tap-only private aggregate used as a **capture** device.
+    ///
+    /// Putting the real output in the same aggregate and playing from that
+    /// IOProc was verified silent on a live Mac (PR #4 and #6). Capture and
+    /// playback are separate: this spec has no output subdevice.
+    struct CaptureAggregateSpec: Equatable {
         var name: String
         var aggregateUID: String
-        var outputDeviceUID: String
         var tapUID: String
 
         var isPrivate: Bool { true }
-        var isStacked: Bool { true }
+        var isStacked: Bool { false }
         var tapAutoStart: Bool { true }
+        var includesOutputSubdevice: Bool { false }
 
         func asDictionary() -> [String: Any] {
             [
@@ -56,12 +51,8 @@ enum TapGain {
                 kAudioAggregateDeviceUIDKey: aggregateUID,
                 kAudioAggregateDeviceIsPrivateKey: isPrivate,
                 kAudioAggregateDeviceIsStackedKey: isStacked,
-                kAudioAggregateDeviceClockDeviceKey: outputDeviceUID,
-                kAudioAggregateDeviceMainSubDeviceKey: outputDeviceUID,
                 kAudioAggregateDeviceTapAutoStartKey: tapAutoStart,
-                kAudioAggregateDeviceSubDeviceListKey: [
-                    [kAudioSubDeviceUIDKey: outputDeviceUID]
-                ],
+                kAudioAggregateDeviceSubDeviceListKey: [] as [[String: Any]],
                 kAudioAggregateDeviceTapListKey: [
                     [
                         kAudioSubTapUIDKey: tapUID,
@@ -72,10 +63,10 @@ enum TapGain {
         }
     }
 
-    /// Skip leading hardware-input buffers on a duplex aggregate, but never
-    /// skip the whole tap. A physical device that reports as many (or more)
-    /// input streams as the aggregate would otherwise make every `gain < 1`
-    /// path write silence after `muteBehavior = .mutedWhenTapped`.
+    static func isDeviceAlive(_ flag: UInt32) -> Bool {
+        flag == 1
+    }
+
     static func inputBufferOffset(physicalInputBuffers: Int, aggregateInputBuffers: Int) -> Int {
         if physicalInputBuffers > 0, physicalInputBuffers < aggregateInputBuffers {
             return physicalInputBuffers
@@ -83,21 +74,57 @@ enum TapGain {
         return 0
     }
 
-    /// HAL `kAudioDevicePropertyDeviceIsAlive` is 1 when IO may start.
-    /// Starting a stacked aggregate before it is alive yields silent buffers
-    /// while `mutedWhenTapped` has already cut the original path.
-    static func isDeviceAlive(_ flag: UInt32) -> Bool {
-        flag == 1
+    /// Copy live tap buffers into interleaved stereo (L,R,L,R,…).
+    /// Empty leading hardware-input buffers are skipped.
+    static func flattenToInterleavedStereo(
+        input: UnsafeMutableAudioBufferListPointer,
+        into destination: UnsafeMutablePointer<Float32>,
+        maxFrames: Int
+    ) -> Int {
+        let sources = channels(in: input, startingAt: 0)
+        guard !sources.isEmpty, maxFrames > 0 else { return 0 }
+        let frames = min(maxFrames, sources.map(\.frames).min() ?? 0)
+        guard frames > 0 else { return 0 }
+        let left = sources[0]
+        let right = sources[min(1, sources.count - 1)]
+        for frame in 0..<frames {
+            destination[frame * 2] = left.get(frame: frame)
+            destination[frame * 2 + 1] = right.get(frame: frame)
+        }
+        return frames
     }
 
-    /// Copy tap samples onto the output device with linear gain.
-    ///
-    /// Layout is taken from the live `AudioBufferList` (`mNumberBuffers` /
-    /// `mNumberChannels` / `mDataByteSize`), not from a tap ASBD. HAL IOProc
-    /// buffers are typically non-interleaved even when `kAudioTapPropertyFormat`
-    /// reports an interleaved mixdown — trusting the ASBD caused `mBytesPerFrame
-    /// == 0` or a buffer-count mismatch, both of which used to early-return
-    /// after the output was zeroed (full mute for any slider below 100%).
+    /// Scale interleaved stereo and write into a live output ABL (interleaved
+    /// or non-interleaved). This is the AUHAL playback path.
+    static func applyInterleavedStereo(
+        _ source: UnsafePointer<Float32>,
+        frames: Int,
+        gain: Float32,
+        to output: UnsafeMutableAudioBufferListPointer
+    ) {
+        for buffer in output {
+            if let data = buffer.mData, buffer.mDataByteSize > 0 {
+                memset(data, 0, Int(buffer.mDataByteSize))
+            }
+        }
+        let applied = max(0, gain)
+        if applied <= 0 || frames <= 0 { return }
+
+        let destinations = channels(in: output, startingAt: 0)
+        guard !destinations.isEmpty else { return }
+        let outFrames = min(frames, destinations.map(\.frames).min() ?? 0)
+        guard outFrames > 0 else { return }
+
+        for frame in 0..<outFrames {
+            for (index, destination) in destinations.enumerated() {
+                let channel = min(index, 1)
+                destination.set(frame: frame, value: source[frame * 2 + channel] * applied)
+            }
+        }
+    }
+
+    /// Copy tap samples onto an output ABL with linear gain (legacy combined
+    /// IOProc). Kept for tests and as a fallback mixer.
     static func mix(
         input: UnsafeMutableAudioBufferListPointer,
         output: UnsafeMutableAudioBufferListPointer,
