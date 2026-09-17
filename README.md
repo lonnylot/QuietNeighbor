@@ -17,9 +17,9 @@ This repository was authored so the Xcode project is complete and CI-compilable.
 
 1. Clone this repo on a Mac and open `QuietNeighbor.xcodeproj`.
 2. Select the **QuietNeighbor** scheme and your Apple Development team (Signing & Capabilities).
-3. Build and run (⌘R). QuietNeighbor is a menu bar extra (`LSUIElement`) — look for the slider icon in the menu bar, not the Dock.
+3. Build and run (⌘R). QuietNeighbor is a menu bar extra (`LSUIElement`) — look for the slider icon in the menu bar, not the Dock. The mixer starts at launch so saved levels apply before you open the menu.
 4. Click the icon. The mixer lists apps that are producing audio, or recently did.
-5. When you first move a slider or mute an app, macOS asks for **audio capture** (sometimes labeled Microphone). Allow it. Without that permission, the list still works but gain cannot be applied.
+5. When you first move a slider or mute an app, macOS asks for **audio capture** (sometimes labeled Microphone). Allow it. Without that permission, the list still works but gain cannot be applied. Saved non-100% / mute levels restore on the next launch once capture is allowed.
 6. Optional: QuietNeighbor → Settings (gear) → **Open at login**.
 
 Command-line build:

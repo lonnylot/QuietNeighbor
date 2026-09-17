@@ -56,6 +56,7 @@ final class MixerController: ObservableObject {
         outputPoller = nil
         monitor.stop()
         engine.stopAll()
+        didStart = false
     }
 
     func requestPermission() {

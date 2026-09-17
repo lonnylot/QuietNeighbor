@@ -24,7 +24,6 @@ struct MixerView: View {
             footer
         }
         .background(.regularMaterial)
-        .onAppear { mixer.start() }
     }
 
     private var header: some View {
