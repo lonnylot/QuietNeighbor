@@ -1,6 +1,5 @@
 import AudioToolbox
 import CoreAudio
-import Darwin
 import Foundation
 import OSLog
 
@@ -10,12 +9,6 @@ struct TapRenderState {
     var gain: Float32
     var muted: Int32
     var inputBufferOffset: Int32
-    var inputChannels: Int32
-    var outputChannels: Int32
-    var inputNonInterleaved: Int32
-    var outputNonInterleaved: Int32
-    var inputBytesPerFrame: Int32
-    var outputBytesPerFrame: Int32
 }
 
 /// One intercepted app: muted Core Audio process tap → private aggregate → IOProc gain.
@@ -43,19 +36,7 @@ final class AppTapSession {
         self.logger = Logger(subsystem: QuietNeighborApp.subsystem, category: "tap.\(persistenceKey)")
         self.ioQueue = DispatchQueue(label: "com.lonnylot.QuietNeighbor.io.\(persistenceKey)")
         self.state = UnsafeMutablePointer<TapRenderState>.allocate(capacity: 1)
-        self.state.initialize(
-            to: TapRenderState(
-                gain: 1,
-                muted: 0,
-                inputBufferOffset: 0,
-                inputChannels: 2,
-                outputChannels: 2,
-                inputNonInterleaved: 0,
-                outputNonInterleaved: 0,
-                inputBytesPerFrame: 8,
-                outputBytesPerFrame: 8
-            )
-        )
+        self.state.initialize(to: TapRenderState(gain: 1, muted: 0, inputBufferOffset: 0))
     }
 
     deinit {
@@ -64,17 +45,17 @@ final class AppTapSession {
         state.deallocate()
     }
 
-    func setGain(_ gain: Float, muted: Bool) {
-        state.pointee.gain = max(0, min(1, gain))
+    func setGain(volume: Float, muted: Bool) {
+        state.pointee.gain = TapGain.linear(volume: Double(volume), isMuted: muted)
         state.pointee.muted = muted ? 1 : 0
     }
 
-    func start(gain: Float, muted: Bool) throws {
+    func start(volume: Float, muted: Bool) throws {
         guard !isRunning else {
-            setGain(gain, muted: muted)
+            setGain(volume: volume, muted: muted)
             return
         }
-        setGain(gain, muted: muted)
+        setGain(volume: volume, muted: muted)
         do {
             try createTap()
             try createAggregate()
@@ -136,11 +117,16 @@ final class AppTapSession {
     }
 
     private func createAggregate() throws {
+        // HAL's assigned tap UID is what the aggregate tap list must reference.
+        // Using the Swift UUID string can miss the tap (case / assigned-id
+        // mismatch) → muted original path + silent IOProc for every gain < 1.
         let tapUID: String
-        if let tapDescriptionUUID {
+        if let uid = try? AudioProperty.readString(tapID, kAudioTapPropertyUID), !uid.isEmpty {
+            tapUID = uid
+        } else if let tapDescriptionUUID {
             tapUID = tapDescriptionUUID.uuidString
         } else {
-            tapUID = try AudioProperty.readString(tapID, kAudioTapPropertyUID)
+            throw CoreAudioError.invalidObject("Process tap has no UID")
         }
 
         let uid = Self.aggregateUIDPrefix + UUID().uuidString
@@ -186,17 +172,18 @@ final class AppTapSession {
             )
         }
 
-        // If the physical output is a duplex device, its input buffers precede the tap.
+        // Duplex outputs (AirPods, USB interfaces) may prepend hardware input
+        // streams. Only skip those when they actually appear on the aggregate —
+        // otherwise the IOProc walks past the tap and plays silence.
         let physicalOutput = deviceID(forUID: outputDeviceUID)
-        let inputOffset = physicalOutput.map { SystemAudio.inputBufferCount(for: $0) } ?? 0
-
-        state.pointee.inputBufferOffset = Int32(inputOffset)
-        state.pointee.inputChannels = Int32(max(1, tapFormat.mChannelsPerFrame))
-        state.pointee.outputChannels = Int32(max(1, outputFormat.mChannelsPerFrame))
-        state.pointee.inputNonInterleaved = tapFormat.isNonInterleaved ? 1 : 0
-        state.pointee.outputNonInterleaved = outputFormat.isNonInterleaved ? 1 : 0
-        state.pointee.inputBytesPerFrame = Int32(tapFormat.mBytesPerFrame)
-        state.pointee.outputBytesPerFrame = Int32(outputFormat.mBytesPerFrame)
+        let physicalInputs = physicalOutput.map { SystemAudio.inputBufferCount(for: $0) } ?? 0
+        let aggregateInputs = SystemAudio.inputBufferCount(for: aggregateID)
+        state.pointee.inputBufferOffset = Int32(
+            TapGain.inputBufferOffset(
+                physicalInputBuffers: physicalInputs,
+                aggregateInputBuffers: aggregateInputs
+            )
+        )
 
         let state = self.state
         let block: AudioDeviceIOBlock = { _, inputData, _, outputData, _ in
@@ -233,59 +220,12 @@ final class AppTapSession {
         let s = state.pointee
         let inList = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
         let outList = UnsafeMutableAudioBufferListPointer(output)
-
-        for buffer in outList {
-            if let data = buffer.mData, buffer.mDataByteSize > 0 {
-                memset(data, 0, Int(buffer.mDataByteSize))
-            }
-        }
-
-        let gain: Float32 = s.muted != 0 ? 0 : s.gain
-        if gain <= 0 { return }
-
-        let inOffset = Int(s.inputBufferOffset)
-        let inChannels = max(1, Int(s.inputChannels))
-        let outChannels = max(1, Int(s.outputChannels))
-        let inNonInterleaved = s.inputNonInterleaved != 0
-        let outNonInterleaved = s.outputNonInterleaved != 0
-        let inBytesPerFrame = Int(s.inputBytesPerFrame)
-        let outBytesPerFrame = Int(s.outputBytesPerFrame)
-        guard inBytesPerFrame > 0, outBytesPerFrame > 0 else { return }
-
-        let inBuffersNeeded = inNonInterleaved ? inChannels : 1
-        guard inList.count >= inOffset + inBuffersNeeded else { return }
-        guard outList.count >= (outNonInterleaved ? outChannels : 1) else { return }
-        guard let firstIn = inList[inOffset].mData, let firstOut = outList[0].mData else { return }
-
-        let inFrames = Int(inList[inOffset].mDataByteSize) / inBytesPerFrame
-        let outFrames = Int(outList[0].mDataByteSize) / outBytesPerFrame
-        let frames = min(inFrames, outFrames)
-        guard frames > 0 else { return }
-
-        for frame in 0..<frames {
-            for channel in 0..<outChannels {
-                let sample: Float32
-                if channel >= inChannels && inChannels <= 2 && channel >= 2 {
-                    sample = 0
-                } else {
-                    let source = min(channel, inChannels - 1)
-                    if inNonInterleaved {
-                        guard let data = inList[inOffset + source].mData else { continue }
-                        sample = data.assumingMemoryBound(to: Float32.self)[frame]
-                    } else {
-                        sample = firstIn.assumingMemoryBound(to: Float32.self)[frame * inChannels + source]
-                    }
-                }
-
-                let value = sample * gain
-                if outNonInterleaved {
-                    if let data = outList[channel].mData {
-                        data.assumingMemoryBound(to: Float32.self)[frame] = value
-                    }
-                } else {
-                    firstOut.assumingMemoryBound(to: Float32.self)[frame * outChannels + channel] = value
-                }
-            }
-        }
+        let gain = s.muted != 0 ? Float32(0) : s.gain
+        TapGain.mix(
+            input: inList,
+            output: outList,
+            gain: gain,
+            inputBufferOffset: Int(s.inputBufferOffset)
+        )
     }
 }

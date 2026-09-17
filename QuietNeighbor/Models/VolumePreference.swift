@@ -2,7 +2,8 @@ import Foundation
 
 /// Persisted per-app mixer state, keyed by bundle identifier (or a stable fallback).
 struct VolumePreference: Codable, Equatable, Sendable {
-    /// Relative gain versus the system output, 0...1.
+    /// Relative linear amplitude versus the system output, 0...1.
+    /// 50% is half as loud as the current system volume — not mute.
     var volume: Double
     var isMuted: Bool
 
@@ -17,6 +18,7 @@ struct VolumePreference: Codable, Equatable, Sendable {
         isMuted || clampedVolume < 0.995
     }
 
+    /// Mute forces 0; otherwise the slider level. Continuous — not binary 0/1.
     var effectiveGain: Double {
         isMuted ? 0 : clampedVolume
     }
