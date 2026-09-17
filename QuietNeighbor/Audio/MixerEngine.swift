@@ -45,7 +45,7 @@ final class MixerEngine: @unchecked Sendable {
         lock.lock()
         let session = sessions[key]
         lock.unlock()
-        session?.setGain(Float(preference.effectiveGain), muted: preference.isMuted)
+        session?.setGain(volume: Float(preference.clampedVolume), muted: preference.isMuted)
     }
 
     func sync(apps: [ResolvedAppIdentity], store: VolumeStore, outputDeviceUID: String?) {
@@ -166,7 +166,7 @@ final class MixerEngine: @unchecked Sendable {
         lock.unlock()
 
         for (session, preference) in keepGain {
-            session.setGain(Float(preference.effectiveGain), muted: preference.isMuted)
+            session.setGain(volume: Float(preference.clampedVolume), muted: preference.isMuted)
         }
 
         finishStops(toStop, sweepOrphans: outputChanged || !toStop.isEmpty)
@@ -178,7 +178,7 @@ final class MixerEngine: @unchecked Sendable {
                 outputDeviceUID: outputUID
             )
             do {
-                try session.start(gain: Float(preference.effectiveGain), muted: preference.isMuted)
+                try session.start(volume: Float(preference.clampedVolume), muted: preference.isMuted)
                 lock.lock()
                 sessions[app.persistenceKey] = session
                 errors.removeValue(forKey: app.persistenceKey)

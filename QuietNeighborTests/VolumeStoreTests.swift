@@ -42,4 +42,27 @@ final class VolumeStoreTests: XCTestCase {
         store.setMuted(false, for: "com.example.app")
         XCTAssertNil(store.allPreferences()["com.example.app"])
     }
+
+    func testMuteForcesSilenceAndUnmuteRestoresSlider() {
+        let store = VolumeStore(defaults: defaults)
+        store.setVolume(0.5, for: "com.apple.Music")
+        store.setMuted(true, for: "com.apple.Music")
+
+        var preference = store.preference(for: "com.apple.Music")
+        XCTAssertTrue(preference.isMuted)
+        XCTAssertEqual(preference.volume, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(preference.effectiveGain, 0)
+        XCTAssertEqual(TapGain.linear(volume: preference.volume, isMuted: preference.isMuted), 0)
+
+        store.setMuted(false, for: "com.apple.Music")
+        preference = store.preference(for: "com.apple.Music")
+        XCTAssertFalse(preference.isMuted)
+        XCTAssertEqual(preference.volume, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(preference.effectiveGain, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(
+            TapGain.linear(volume: preference.volume, isMuted: preference.isMuted),
+            0.5,
+            accuracy: 0.0001
+        )
+    }
 }
