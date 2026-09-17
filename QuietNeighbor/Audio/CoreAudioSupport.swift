@@ -183,6 +183,28 @@ enum SystemAudio {
         return try AudioProperty.read(stream, kAudioStreamPropertyVirtualFormat)
     }
 
+    static func isDeviceAlive(_ device: AudioObjectID) -> Bool {
+        var property = AudioProperty.address(kAudioDevicePropertyDeviceIsAlive)
+        var alive: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(device, &property, 0, nil, &size, &alive)
+        return status == noErr && TapGain.isDeviceAlive(alive)
+    }
+
+    /// Stacked tap aggregates can take a beat to come up. Starting IO before
+    /// `DeviceIsAlive` yields empty buffers after `mutedWhenTapped` has
+    /// already silenced the original hardware path.
+    static func waitUntilAlive(
+        _ device: AudioObjectID,
+        attempts: Int = 25,
+        interval: TimeInterval = 0.02
+    ) {
+        for _ in 0..<attempts {
+            if isDeviceAlive(device) { return }
+            Thread.sleep(forTimeInterval: interval)
+        }
+    }
+
     static func destroyOrphanedQuietNeighborAggregates() {
         let devices: [AudioObjectID]
         do {

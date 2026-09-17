@@ -46,8 +46,11 @@ final class AppTapSession {
     }
 
     func setGain(volume: Float, muted: Bool) {
-        state.pointee.gain = TapGain.linear(volume: Double(volume), isMuted: muted)
-        state.pointee.muted = muted ? 1 : 0
+        let command = TapGain.ioCommand(
+            for: VolumePreference(volume: Double(volume), isMuted: muted)
+        )
+        state.pointee.gain = command.gain
+        state.pointee.muted = command.muted ? 1 : 0
     }
 
     func start(volume: Float, muted: Bool) throws {
@@ -117,40 +120,27 @@ final class AppTapSession {
     }
 
     private func createAggregate() throws {
-        // HAL's assigned tap UID is what the aggregate tap list must reference.
-        // Using the Swift UUID string can miss the tap (case / assigned-id
-        // mismatch) → muted original path + silent IOProc for every gain < 1.
-        let tapUID: String
-        if let uid = try? AudioProperty.readString(tapID, kAudioTapPropertyUID), !uid.isEmpty {
-            tapUID = uid
-        } else if let tapDescriptionUUID {
-            tapUID = tapDescriptionUUID.uuidString
-        } else {
+        // Attach with the UUID we assigned on CATapDescription. HAL's
+        // kAudioTapPropertyUID can differ and then the tap never joins —
+        // mutedWhenTapped + silent IOProc for every slider below 100%.
+        let hardwareUID = try? AudioProperty.readString(tapID, kAudioTapPropertyUID)
+        guard let tapUID = TapGain.aggregateTapUID(
+            assigned: tapDescriptionUUID?.uuidString,
+            hardware: hardwareUID
+        ) else {
             throw CoreAudioError.invalidObject("Process tap has no UID")
         }
 
-        let uid = Self.aggregateUIDPrefix + UUID().uuidString
-        let description: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "QuietNeighbor \(persistenceKey)",
-            kAudioAggregateDeviceUIDKey: uid,
-            kAudioAggregateDeviceIsPrivateKey: true,
-            kAudioAggregateDeviceIsStackedKey: false,
-            kAudioAggregateDeviceMainSubDeviceKey: outputDeviceUID,
-            kAudioAggregateDeviceSubDeviceListKey: [
-                [kAudioSubDeviceUIDKey: outputDeviceUID]
-            ],
-            kAudioAggregateDeviceTapAutoStartKey: true,
-            kAudioAggregateDeviceTapListKey: [
-                [
-                    kAudioSubTapUIDKey: tapUID,
-                    kAudioSubTapDriftCompensationKey: true
-                ]
-            ]
-        ]
+        let spec = TapGain.AggregateSpec(
+            name: "QuietNeighbor \(persistenceKey)",
+            aggregateUID: Self.aggregateUIDPrefix + UUID().uuidString,
+            outputDeviceUID: outputDeviceUID,
+            tapUID: tapUID
+        )
 
         var id = AudioObjectID.unknown
         try AudioProperty.check(
-            AudioHardwareCreateAggregateDevice(description as CFDictionary, &id),
+            AudioHardwareCreateAggregateDevice(spec.asDictionary() as CFDictionary, &id),
             "AudioHardwareCreateAggregateDevice"
         )
         guard id.isValid else {
@@ -196,6 +186,10 @@ final class AppTapSession {
             "AudioDeviceCreateIOProcIDWithBlock"
         )
         ioProcID = procID
+        // Stacked aggregates are not always alive the instant they are
+        // created. Starting too early writes silence while the original
+        // path is already muted.
+        SystemAudio.waitUntilAlive(aggregateID)
         try AudioProperty.check(AudioDeviceStart(aggregateID, procID), "AudioDeviceStart")
     }
 

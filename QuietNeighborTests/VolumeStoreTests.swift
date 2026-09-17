@@ -81,6 +81,22 @@ final class VolumeStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.preference(for: "com.apple.Music").effectiveGain, 0)
     }
 
+    func testPartialSliderPersistsAsContinuousGainNotMute() {
+        let store = VolumeStore(defaults: defaults)
+        store.setVolume(0.5, for: "com.apple.Music")
+
+        let preference = store.preference(for: "com.apple.Music")
+        XCTAssertFalse(preference.isMuted)
+        XCTAssertEqual(preference.volume, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(preference.effectiveGain, 0.5, accuracy: 0.0001)
+        XCTAssertTrue(preference.needsTap)
+
+        let command = TapGain.ioCommand(for: preference)
+        XCTAssertFalse(command.muted)
+        XCTAssertEqual(command.gain, 0.5, accuracy: 0.0001)
+        XCTAssertNotEqual(command.gain, 0)
+    }
+
     func testUnmuteRestoresSavedVolumeWithoutClearingIt() {
         let store = VolumeStore(defaults: defaults)
         store.setVolume(0.35, for: "com.example.loud")
