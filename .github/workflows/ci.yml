@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Xcode project
+        id: xcode
+        run: |
+          set -euo pipefail
+
+          workspace=$(find . -name '*.xcworkspace' -not -path '*/Pods/*' -not -path '*/.git/*' | head -n 1 || true)
+          project=$(find . -name '*.xcodeproj' -not -path '*/Pods/*' -not -path '*/.git/*' | head -n 1 || true)
+
+          if [ -n "$workspace" ]; then
+            echo "Using workspace: $workspace"
+            echo "project_flag=-workspace" >> "$GITHUB_OUTPUT"
+            echo "project_path=$workspace" >> "$GITHUB_OUTPUT"
+            list_args=(-workspace "$workspace")
+          elif [ -n "$project" ]; then
+            echo "Using project: $project"
+            echo "project_flag=-project" >> "$GITHUB_OUTPUT"
+            echo "project_path=$project" >> "$GITHUB_OUTPUT"
+            list_args=(-project "$project")
+          else
+            echo "No Xcode project or workspace found; skipping build."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          scheme=$(xcodebuild -list "${list_args[@]}" 2>/dev/null | awk '
+            /^[[:space:]]*Schemes:/ { in_schemes=1; next }
+            in_schemes && /^[[:space:]]*$/ { exit }
+            in_schemes && /QuietNeighbor/ { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print; found=1; exit }
+            in_schemes && NF && !found { first=$0 }
+            END {
+              if (!found && first != "") {
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", first)
+                print first
+              }
+            }
+          ')
+
+          if [ -z "$scheme" ]; then
+            echo "Could not resolve an Xcode scheme; skipping build."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Using scheme: $scheme"
+          echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        if: steps.xcode.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            "${{ steps.xcode.outputs.project_flag }}" "${{ steps.xcode.outputs.project_path }}" \
+            -scheme "${{ steps.xcode.outputs.scheme }}" \
+            -destination 'platform=macOS' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
