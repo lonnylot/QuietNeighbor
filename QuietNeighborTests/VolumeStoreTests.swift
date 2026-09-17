@@ -65,4 +65,31 @@ final class VolumeStoreTests: XCTestCase {
             accuracy: 0.0001
         )
     }
+
+    func testMuteAlonePersistsAtFullVolume() {
+        let store = VolumeStore(defaults: defaults)
+        store.setMuted(true, for: "com.apple.Music")
+
+        let preference = store.preference(for: "com.apple.Music")
+        XCTAssertTrue(preference.isMuted)
+        XCTAssertEqual(preference.volume, 1, accuracy: 0.0001)
+        XCTAssertEqual(preference.effectiveGain, 0)
+        XCTAssertTrue(preference.needsTap)
+
+        let reloaded = VolumeStore(defaults: defaults)
+        XCTAssertTrue(reloaded.preference(for: "com.apple.Music").isMuted)
+        XCTAssertEqual(reloaded.preference(for: "com.apple.Music").effectiveGain, 0)
+    }
+
+    func testUnmuteRestoresSavedVolumeWithoutClearingIt() {
+        let store = VolumeStore(defaults: defaults)
+        store.setVolume(0.35, for: "com.example.loud")
+        store.setMuted(true, for: "com.example.loud")
+        store.setMuted(false, for: "com.example.loud")
+
+        let preference = store.preference(for: "com.example.loud")
+        XCTAssertFalse(preference.isMuted)
+        XCTAssertEqual(preference.volume, 0.35, accuracy: 0.0001)
+        XCTAssertEqual(preference.effectiveGain, 0.35, accuracy: 0.0001)
+    }
 }

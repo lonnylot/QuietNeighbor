@@ -39,6 +39,7 @@ final class VolumePreferenceTests: XCTestCase {
         let preference = VolumePreference(volume: 1, isMuted: true)
         XCTAssertTrue(preference.needsTap)
         XCTAssertEqual(preference.effectiveGain, 0)
+        XCTAssertNotEqual(preference, .default)
     }
 
     func testNearUnityIsPassthrough() {

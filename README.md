@@ -20,7 +20,10 @@ This repository was authored so the Xcode project is complete and CI-compilable.
 3. Build and run (⌘R). QuietNeighbor is a menu bar extra (`LSUIElement`) — look for the slider icon in the menu bar, not the Dock. The mixer starts at launch so saved levels apply before you open the menu.
 4. Click the icon. The mixer lists apps that are producing audio, or recently did.
 5. When you first move a slider or mute an app, macOS asks for **audio capture** (sometimes labeled Microphone). Allow it. Without that permission, the list still works but gain cannot be applied. Saved non-100% / mute levels restore on the next launch once capture is allowed.
-6. Optional: QuietNeighbor → Settings (gear) → **Open at login**.
+6. **Mute** is a 36×36 toggle (not a tiny glyph). Accessibility Inspector should see `quietNeighbor.mute.<bundle-id>` with label Mute/Unmute and value Muted/Unmuted. Toggling writes `isMuted` to `UserDefaults` (`quietNeighbor.volumeByApp`) and starts the existing process tap at gain 0 so only that app is silenced.
+7. Optional: QuietNeighbor → Settings (gear) → **Open at login**.
+
+The menu-bar extra uses the system slider symbol. The **App Icon** is the yellow bird shush already on `main` (`QuietNeighbor/Assets.xcassets/AppIcon.appiconset`).
 
 Command-line build:
 
@@ -40,7 +43,7 @@ xcodebuild \
 macOS has no public `setAppVolume` API. QuietNeighbor uses the modern HAL path:
 
 1. **Discover** audio clients with `kAudioHardwarePropertyProcessObjectList` and `kAudioProcessPropertyIsRunningOutput`. Helper / GPU / WebKit processes are grouped under the owning app (bundle id) so Chrome or Safari appear as one row.
-2. **List** those apps in the menu bar mixer, with icon, name, 0–100% slider, and mute.
+2. **List** those apps in the menu bar mixer, with icon, name, 0–100% slider, and a 36×36 mute toggle (`quietNeighbor.mute.<bundle-id>`).
 3. **Intercept only when needed.** At 100% and unmuted, the app plays normally. If you lower the slider or mute, QuietNeighbor:
    - creates a private `CATapDescription` mixdown of that app’s process objects
    - sets `muteBehavior = .mutedWhenTapped` so the original hardware path is silenced (no double audio)
@@ -83,13 +86,13 @@ QuietNeighbor/
   MixerController.swift          UI state, persistence, tap lifecycle
   Audio/                         Process monitor, tap + aggregate + IOProc
   Persistence/VolumeStore.swift  Bundle-id keyed UserDefaults
-  UI/                            Mixer popover and settings
+  UI/                            Mixer popover, mute toggle, settings
   QuietNeighbor.entitlements     Audio capture; sandbox off
 ```
 
 ## CI
 
-`.github/workflows/ci.yml` runs `xcodebuild` build + `QuietNeighborTests` on `macos-latest` for the QuietNeighbor scheme with signing disabled. The old “skip if no Xcode project” path is gone — the project is required. Tests cover `VolumePreference` / `VolumeStore` only (no live audio).
+`.github/workflows/ci.yml` runs `xcodebuild` build + `QuietNeighborTests` on `macos-latest` for the QuietNeighbor scheme with signing disabled. The old “skip if no Xcode project” path is gone — the project is required. Tests cover `VolumePreference` / `VolumeStore` persistence (including mute-only), `TapGain` relative gain, and mute AX identifier strings. Live mute still needs a Mac.
 
 ## License
 

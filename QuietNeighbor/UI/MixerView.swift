@@ -44,6 +44,8 @@ struct MixerView: View {
             }
             .buttonStyle(.plain)
             .help("Settings")
+            .accessibilityIdentifier(MixerAccessibility.settingsIdentifier)
+            .accessibilityLabel("Settings")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
