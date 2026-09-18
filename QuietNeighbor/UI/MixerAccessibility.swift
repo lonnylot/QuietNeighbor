@@ -23,4 +23,6 @@ enum MixerAccessibility {
     }
 
     static let settingsIdentifier = "quietNeighbor.settings"
+    static let systemAudioRecordingIdentifier = "quietNeighbor.systemAudioRecording"
+    static let openSystemAudioRecordingIdentifier = "quietNeighbor.openSystemAudioRecording"
 }

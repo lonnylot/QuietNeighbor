@@ -40,6 +40,18 @@ final class MixerEngine: @unchecked Sendable {
         return sessions[key]?.isRunning == true
     }
 
+    /// Peak of tap samples since start, plus how long the session has been up.
+    /// Used to detect unauthorized system-audio taps (zeros, no error).
+    func captureSnapshot(for key: String) -> (peak: Float, runningFor: TimeInterval)? {
+        lock.lock()
+        let session = sessions[key]
+        lock.unlock()
+        guard let session, session.isRunning, let started = session.runningSince else {
+            return nil
+        }
+        return (session.capturedPeak, Date().timeIntervalSince(started))
+    }
+
     /// Immediate gain write for an already-running session. Does not create taps.
     func updateGain(for key: String, preference: VolumePreference) {
         lock.lock()

@@ -27,12 +27,18 @@ struct SettingsView: View {
             }
 
             Section("Permissions") {
-                Text("Process taps need audio capture / microphone permission. QuietNeighbor is not sandboxed so Core Audio taps can attach to other apps. Prefer a Developer ID signed, notarized build over the App Store sandbox.")
+                Text("Two grants: Microphone / Audio Capture, and Screen & System Audio Recording (macOS 14.4+). An unauthorized tap returns silence with no error — a slider below 100% then sounds like mute. Unsigned or ad-hoc builds cannot receive the second grant. Local runs should use Apple Development team 4GBSMHY66W.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("Open Privacy Settings") {
-                    AudioCapturePermission.openSystemSettings()
+                if mixer.systemAudioRecordingMissing {
+                    Text("Tap is capturing silence. Allow QuietNeighbor under Screen & System Audio Recording, then Recheck.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                 }
+                Button("Open Screen & System Audio Recording") {
+                    mixer.openSystemAudioRecordingSettings()
+                }
+                .accessibilityIdentifier(MixerAccessibility.openSystemAudioRecordingIdentifier)
                 Button("Recheck permission") {
                     mixer.refresh()
                 }

@@ -33,6 +33,7 @@
 		B0B100000000000000000016 /* TapGain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000034 /* TapGain.swift */; };
 		B0B100000000000000000017 /* TapGainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0B100000000000000000018 /* TapGainTests.swift */; };
 		B0B100000000000000000019 /* TapRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000036 /* TapRingBuffer.swift */; };
+		B0B100000000000000000020 /* AudioCapturePermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A100000000000000000012 /* AudioCapturePermission.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -288,6 +289,7 @@
 				B0B100000000000000000012 /* VolumeStore.swift in Sources */,
 				B0B100000000000000000016 /* TapGain.swift in Sources */,
 				B0B100000000000000000019 /* TapRingBuffer.swift in Sources */,
+				B0B100000000000000000020 /* AudioCapturePermission.swift in Sources */,
 				B0B100000000000000000013 /* MixerAccessibility.swift in Sources */,
 				B0B100000000000000000003 /* VolumePreferenceTests.swift in Sources */,
 				B0B100000000000000000004 /* VolumeStoreTests.swift in Sources */,
@@ -428,6 +430,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4GBSMHY66W;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -440,6 +443,7 @@
 				INFOPLIST_KEY_NSAudioCaptureUsageDescription = "QuietNeighbor uses Core Audio process taps to apply per-app volume. Audio is processed locally and played through your selected output device. The Mac’s system volume remains the master.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 QuietNeighbor";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "QuietNeighbor captures other apps’ audio through Core Audio process taps so it can apply a per-app volume, then plays that audio through your current output device.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "QuietNeighbor needs Screen & System Audio Recording so Core Audio process taps receive other apps’ audio. Without this grant the tap is silent and a slider below 100% sounds like mute. Audio stays on this Mac.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -462,6 +466,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4GBSMHY66W;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -474,6 +479,7 @@
 				INFOPLIST_KEY_NSAudioCaptureUsageDescription = "QuietNeighbor uses Core Audio process taps to apply per-app volume. Audio is processed locally and played through your selected output device. The Mac’s system volume remains the master.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 QuietNeighbor";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "QuietNeighbor captures other apps’ audio through Core Audio process taps so it can apply a per-app volume, then plays that audio through your current output device.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "QuietNeighbor needs Screen & System Audio Recording so Core Audio process taps receive other apps’ audio. Without this grant the tap is silent and a slider below 100% sounds like mute. Audio stays on this Mac.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

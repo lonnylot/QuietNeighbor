@@ -67,6 +67,37 @@ enum TapGain {
         flag == 1
     }
 
+    /// Unauthorized system-audio taps return zeros with no error — the live
+    /// Mac symptom that looks exactly like “slider below 100% mutes.”
+    enum CaptureHealth {
+        static let silenceThreshold: Float = 1e-5
+        static let grace: TimeInterval = 0.75
+
+        static func looksUnauthorized(
+            capturedPeak: Float,
+            runningFor: TimeInterval,
+            isPlaying: Bool,
+            preference: VolumePreference
+        ) -> Bool {
+            preference.needsTap
+                && !preference.isMuted
+                && preference.clampedVolume > 0
+                && isPlaying
+                && runningFor >= grace
+                && capturedPeak < silenceThreshold
+        }
+
+        static func peak(of samples: UnsafePointer<Float32>, count: Int) -> Float32 {
+            guard count > 0 else { return 0 }
+            var peak: Float32 = 0
+            for index in 0..<count {
+                let magnitude = abs(samples[index])
+                if magnitude > peak { peak = magnitude }
+            }
+            return peak
+        }
+    }
+
     static func inputBufferOffset(physicalInputBuffers: Int, aggregateInputBuffers: Int) -> Int {
         if physicalInputBuffers > 0, physicalInputBuffers < aggregateInputBuffers {
             return physicalInputBuffers
