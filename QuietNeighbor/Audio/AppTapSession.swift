@@ -8,6 +8,7 @@ import OSLog
 struct TapRenderState {
     var gain: Float32
     var muted: Int32
+    var capturedPeak: Float32
 }
 
 struct TapPlaybackContext {
@@ -20,9 +21,8 @@ struct TapPlaybackContext {
 /// One intercepted app: muted process tap → tap-only capture aggregate → ring
 /// → AUHAL on the real output device (gain applied there).
 ///
-/// Playing back through the same private aggregate that holds the tap was
-/// verified silent on a live Mac after #4 and #6. Capture and playback are
-/// separate HAL clients so `mutedWhenTapped` cannot swallow the replay.
+/// Capture and playback are separate HAL clients so `mutedWhenTapped`
+/// silences the original path without swallowing the replay.
 final class AppTapSession {
     static let aggregateUIDPrefix = "com.lonnylot.QuietNeighbor.agg."
     static let ringSampleCapacity = 16_384
@@ -32,6 +32,11 @@ final class AppTapSession {
     private(set) var processObjectIDs: [AudioObjectID]
     private(set) var outputDeviceUID: String
     private(set) var isRunning = false
+    private(set) var runningSince: Date?
+
+    var capturedPeak: Float {
+        Float(state.pointee.capturedPeak)
+    }
 
     private let logger: Logger
     private let state: UnsafeMutablePointer<TapRenderState>
@@ -52,7 +57,7 @@ final class AppTapSession {
         self.outputDeviceUID = outputDeviceUID
         self.logger = Logger(subsystem: QuietNeighborApp.subsystem, category: "tap.\(persistenceKey)")
         self.state = UnsafeMutablePointer<TapRenderState>.allocate(capacity: 1)
-        self.state.initialize(to: TapRenderState(gain: 1, muted: 0))
+        self.state.initialize(to: TapRenderState(gain: 1, muted: 0, capturedPeak: 0))
         self.ring = TapRingBuffer.allocate(sampleCapacity: Self.ringSampleCapacity)
         self.flattenScratch = UnsafeMutablePointer<Float32>.allocate(capacity: Self.flattenScratchFrames * 2)
         self.flattenScratch.initialize(repeating: 0, count: Self.flattenScratchFrames * 2)
@@ -92,6 +97,7 @@ final class AppTapSession {
             try startCapture()
             try startPlayback()
             isRunning = true
+            runningSince = Date()
             logger.info("Tap+AUHAL running for \(self.persistenceKey, privacy: .public)")
         } catch {
             stop()
@@ -121,6 +127,7 @@ final class AppTapSession {
         tapID = .unknown
         tapDescriptionUUID = nil
         isRunning = false
+        runningSince = nil
 
         if let proc, aggregate.isValid {
             AudioDeviceStop(aggregate, proc)
@@ -185,8 +192,7 @@ final class AppTapSession {
     }
 
     /// Apple's documented attach path: set `kAudioAggregateDevicePropertyTapList`
-    /// on the aggregate after create. Creation-dictionary-only was not enough
-    /// to get a live playback path on the user's Mac.
+    /// on the aggregate after create, in addition to the creation dictionary.
     private func attachTapList() throws {
         let assigned = tapDescriptionUUID?.uuidString
         let hardware = try? AudioProperty.readString(tapID, kAudioTapPropertyUID)
@@ -230,7 +236,9 @@ final class AppTapSession {
         let ring = self.ring
         let scratch = flattenScratch
         let maxFrames = Self.flattenScratchFrames
-        // nil queue = HAL realtime thread. A GCD hop was a live-silence suspect.
+        let state = self.state
+        state.pointee.capturedPeak = 0
+        // HAL realtime thread (`queue: nil`). A GCD hop can drop early buffers.
         let block: AudioDeviceIOBlock = { _, inputData, _, _, _ in
             let input = UnsafeMutableAudioBufferListPointer(
                 UnsafeMutablePointer(mutating: inputData)
@@ -242,6 +250,10 @@ final class AppTapSession {
             )
             if frames > 0 {
                 ring.write(from: scratch, count: frames * 2)
+                let peak = TapGain.CaptureHealth.peak(of: scratch, count: frames * 2)
+                if peak > state.pointee.capturedPeak {
+                    state.pointee.capturedPeak = peak
+                }
             }
         }
 

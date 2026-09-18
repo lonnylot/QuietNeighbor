@@ -1,6 +1,6 @@
 import Foundation
 
-/// Stable Accessibility identifiers for Mac QA / Accessibility Inspector.
+/// Stable Accessibility identifiers for the mixer UI.
 enum MixerAccessibility {
     static func muteIdentifier(for persistenceKey: String) -> String {
         "quietNeighbor.mute.\(persistenceKey)"
@@ -23,4 +23,6 @@ enum MixerAccessibility {
     }
 
     static let settingsIdentifier = "quietNeighbor.settings"
+    static let systemAudioRecordingIdentifier = "quietNeighbor.systemAudioRecording"
+    static let openSystemAudioRecordingIdentifier = "quietNeighbor.openSystemAudioRecording"
 }

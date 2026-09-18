@@ -122,8 +122,7 @@ struct AppRowView: View {
     }
 }
 
-/// Button-styled toggle with a 36×36 hit target so Accessibility Inspector / AX
-/// click can land on mute (the old 18pt glyph-only control was routinely missed).
+/// Button-styled mute toggle with a 36×36 hit target.
 private struct LargeHitMuteToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         Button {

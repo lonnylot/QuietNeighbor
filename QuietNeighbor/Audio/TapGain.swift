@@ -31,10 +31,8 @@ enum TapGain {
     }
 
     /// Tap-only private aggregate used as a **capture** device.
-    ///
-    /// Putting the real output in the same aggregate and playing from that
-    /// IOProc was verified silent on a live Mac (PR #4 and #6). Capture and
-    /// playback are separate: this spec has no output subdevice.
+    /// Playback goes through a separate AUHAL on the real output — this
+    /// spec has no output subdevice.
     struct CaptureAggregateSpec: Equatable {
         var name: String
         var aggregateUID: String
@@ -65,6 +63,37 @@ enum TapGain {
 
     static func isDeviceAlive(_ flag: UInt32) -> Bool {
         flag == 1
+    }
+
+    /// Unauthorized system-audio taps return zeros with no error — the
+    /// symptom that looks like “slider below 100% mutes.”
+    enum CaptureHealth {
+        static let silenceThreshold: Float = 1e-5
+        static let grace: TimeInterval = 0.75
+
+        static func looksUnauthorized(
+            capturedPeak: Float,
+            runningFor: TimeInterval,
+            isPlaying: Bool,
+            preference: VolumePreference
+        ) -> Bool {
+            preference.needsTap
+                && !preference.isMuted
+                && preference.clampedVolume > 0
+                && isPlaying
+                && runningFor >= grace
+                && capturedPeak < silenceThreshold
+        }
+
+        static func peak(of samples: UnsafePointer<Float32>, count: Int) -> Float32 {
+            guard count > 0 else { return 0 }
+            var peak: Float32 = 0
+            for index in 0..<count {
+                let magnitude = abs(samples[index])
+                if magnitude > peak { peak = magnitude }
+            }
+            return peak
+        }
     }
 
     static func inputBufferOffset(physicalInputBuffers: Int, aggregateInputBuffers: Int) -> Int {
@@ -123,8 +152,8 @@ enum TapGain {
         }
     }
 
-    /// Copy tap samples onto an output ABL with linear gain (legacy combined
-    /// IOProc). Kept for tests and as a fallback mixer.
+    /// Copy tap samples onto an output ABL with linear gain. Used by tests
+    /// and as a fallback mixer for combined input/output buffer lists.
     static func mix(
         input: UnsafeMutableAudioBufferListPointer,
         output: UnsafeMutableAudioBufferListPointer,

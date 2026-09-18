@@ -8,7 +8,10 @@ struct MixerView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            if mixer.permission != .authorized {
+            if mixer.systemAudioRecordingMissing {
+                systemAudioRecordingBanner
+                Divider()
+            } else if mixer.permission != .authorized {
                 permissionBanner
                 Divider()
             } else if let lastError = mixer.lastError {
@@ -51,11 +54,39 @@ struct MixerView: View {
         .padding(.vertical, 12)
     }
 
+    private var systemAudioRecordingBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("System Audio Recording is off")
+                .font(.system(size: 12, weight: .semibold))
+            Text("The tap is running but capturing silence — this is not mute. Allow QuietNeighbor under Privacy & Security → Screen & System Audio Recording. Microphone permission is not enough, and an unsigned or ad-hoc build cannot receive this grant.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Open Screen & System Audio Recording") {
+                    mixer.openSystemAudioRecordingSettings()
+                }
+                .controlSize(.small)
+                .keyboardShortcut(.defaultAction)
+                .accessibilityIdentifier(MixerAccessibility.openSystemAudioRecordingIdentifier)
+                Button("Recheck") {
+                    mixer.refresh()
+                }
+                .controlSize(.small)
+            }
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.12))
+        .accessibilityIdentifier(MixerAccessibility.systemAudioRecordingIdentifier)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("System Audio Recording is off")
+    }
+
     private var permissionBanner: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(permissionTitle)
                 .font(.system(size: 12, weight: .semibold))
-            Text("macOS treats process taps as audio capture. Allow Microphone and, on 14.4+, System Audio Recording (Privacy → Screen & System Audio Recording). Without the second grant the tap is silent — the slider looks like mute.")
+            Text("macOS treats process taps as audio capture. Allow Microphone and System Audio Recording (Privacy → Screen & System Audio Recording). Without the second grant the tap is silent — the slider looks like mute.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -67,10 +98,11 @@ struct MixerView: View {
                     .controlSize(.small)
                     .keyboardShortcut(.defaultAction)
                 } else {
-                    Button("Open Privacy Settings") {
-                        AudioCapturePermission.openSystemSettings()
+                    Button("Open Screen & System Audio Recording") {
+                        mixer.openSystemAudioRecordingSettings()
                     }
                     .controlSize(.small)
+                    .accessibilityIdentifier(MixerAccessibility.openSystemAudioRecordingIdentifier)
                 }
                 Button("Recheck") {
                     mixer.refresh()

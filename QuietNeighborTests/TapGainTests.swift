@@ -287,6 +287,91 @@ final class TapGainTests: XCTestCase {
             "Partial slider must write scaled samples, not silence"
         )
     }
+
+    func testSilentPlayingTapLooksUnauthorized() {
+        let preference = VolumePreference(volume: 0.5, isMuted: false)
+        XCTAssertTrue(
+            TapGain.CaptureHealth.looksUnauthorized(
+                capturedPeak: 0,
+                runningFor: TapGain.CaptureHealth.grace,
+                isPlaying: true,
+                preference: preference
+            ),
+            "Zeros after grace while playing at 50% is the unauthorized-tap symptom"
+        )
+    }
+
+    func testCaptureHealthIgnoresMuteZeroVolumeAndWarmup() {
+        let half = VolumePreference(volume: 0.5, isMuted: false)
+        XCTAssertFalse(
+            TapGain.CaptureHealth.looksUnauthorized(
+                capturedPeak: 0,
+                runningFor: 0.1,
+                isPlaying: true,
+                preference: half
+            ),
+            "Warm-up zeros are not a permission failure"
+        )
+        XCTAssertFalse(
+            TapGain.CaptureHealth.looksUnauthorized(
+                capturedPeak: 0,
+                runningFor: 2,
+                isPlaying: true,
+                preference: VolumePreference(volume: 0.5, isMuted: true)
+            )
+        )
+        XCTAssertFalse(
+            TapGain.CaptureHealth.looksUnauthorized(
+                capturedPeak: 0,
+                runningFor: 2,
+                isPlaying: true,
+                preference: VolumePreference(volume: 0, isMuted: false)
+            )
+        )
+        XCTAssertFalse(
+            TapGain.CaptureHealth.looksUnauthorized(
+                capturedPeak: 0,
+                runningFor: 2,
+                isPlaying: false,
+                preference: half
+            )
+        )
+        XCTAssertFalse(
+            TapGain.CaptureHealth.looksUnauthorized(
+                capturedPeak: 0,
+                runningFor: 2,
+                isPlaying: true,
+                preference: .default
+            )
+        )
+        XCTAssertFalse(
+            TapGain.CaptureHealth.looksUnauthorized(
+                capturedPeak: 0.02,
+                runningFor: 2,
+                isPlaying: true,
+                preference: half
+            )
+        )
+    }
+
+    func testCapturePeakUsesAbsoluteMagnitude() {
+        var samples: [Float32] = [0.1, -0.8, 0.25]
+        XCTAssertEqual(
+            samples.withUnsafeBufferPointer { TapGain.CaptureHealth.peak(of: $0.baseAddress!, count: 0) },
+            0
+        )
+        samples = [0, 0, 0]
+        XCTAssertEqual(
+            samples.withUnsafeBufferPointer { TapGain.CaptureHealth.peak(of: $0.baseAddress!, count: 3) },
+            0
+        )
+        samples = [0.1, -0.8, 0.25]
+        XCTAssertEqual(
+            samples.withUnsafeBufferPointer { TapGain.CaptureHealth.peak(of: $0.baseAddress!, count: 3) },
+            0.8,
+            accuracy: 0.0001
+        )
+    }
 }
 
 /// Heap `AudioBufferList` for gain tests. Mirrors HAL interleaved (1 buffer, N
