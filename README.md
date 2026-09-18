@@ -1,5 +1,9 @@
 # QuietNeighbor
 
+<p align="center">
+  <img src="docs/images/hero.png" alt="QuietNeighbor hero: a yellow cartoon bird shushing in a living room of speaker icons" width="960">
+</p>
+
 Quiet the loud neighbor without turning down the whole room.
 
 QuietNeighbor is a native SwiftUI **menu bar mixer** for macOS. Each slider is **relative gain** versus the current system volume — YouTube at 50%, Discord at 100%, and the Mac’s volume keys still run the room.
@@ -8,12 +12,24 @@ QuietNeighbor is a native SwiftUI **menu bar mixer** for macOS. Each slider is *
 
 ## Features
 
+<p align="center">
+  <img src="docs/images/appicon.png" alt="QuietNeighbor app icon — yellow cartoon bird shushing on a coral rounded square" width="96">
+</p>
+
 - Per-app volume slider (0–100%)
 - Per-app mute (only that app goes silent)
 - Levels persist by bundle identifier
 - Yellow bird App Icon (the shush)
 
 QuietNeighbor lives in the menu bar (`LSUIElement`) — look for the slider icon, not the Dock.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/images/screenshot-mixer.png" alt="QuietNeighbor menu bar mixer showing Music at 70% and Safari at 100%" width="380">
+  <br>
+  <em>Menu bar mixer — per-app relative volume</em>
+</p>
 
 ## Requirements
 
@@ -99,6 +115,7 @@ Developer ID signing and notarization are **not** required to build from source.
 ```
 QuietNeighbor.xcodeproj          Shared QuietNeighbor scheme (used by CI)
 LICENSE                          MIT
+docs/images/                     README hero, mixer screenshot, App Icon
 QuietNeighbor/
   QuietNeighborApp.swift         Menu bar extra + Settings
   MixerController.swift          UI state, persistence, tap lifecycle
