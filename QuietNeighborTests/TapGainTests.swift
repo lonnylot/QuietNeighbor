@@ -117,6 +117,176 @@ final class TapGainTests: XCTestCase {
         XCTAssertEqual(TapGain.inputBufferOffset(physicalInputBuffers: 2, aggregateInputBuffers: 2), 0)
         XCTAssertEqual(TapGain.inputBufferOffset(physicalInputBuffers: 8, aggregateInputBuffers: 2), 0)
     }
+
+    func testIOCommandKeepsPartialSliderAudible() {
+        let preference = VolumePreference(volume: 0.5, isMuted: false)
+        let command = TapGain.ioCommand(for: preference)
+        XCTAssertEqual(command.volume, 0.5, accuracy: 0.0001)
+        XCTAssertFalse(command.muted)
+        XCTAssertEqual(command.gain, 0.5, accuracy: 0.0001)
+        XCTAssertNotEqual(command.gain, 0, "50% must not collapse to mute")
+    }
+
+    func testIOCommandMuteIsIndependentOfSlider() {
+        let mutedHalf = TapGain.ioCommand(for: VolumePreference(volume: 0.5, isMuted: true))
+        XCTAssertTrue(mutedHalf.muted)
+        XCTAssertEqual(mutedHalf.gain, 0)
+        XCTAssertEqual(mutedHalf.volume, 0.5, accuracy: 0.0001)
+
+        let unmutedHalf = TapGain.ioCommand(for: VolumePreference(volume: 0.5, isMuted: false))
+        XCTAssertFalse(unmutedHalf.muted)
+        XCTAssertEqual(unmutedHalf.gain, 0.5, accuracy: 0.0001)
+    }
+
+    func testAggregateTapUIDPrefersAssignedDescriptionUUID() {
+        XCTAssertEqual(
+            TapGain.aggregateTapUID(assigned: "ASSIGNED-UUID", hardware: "hardware-uid"),
+            "ASSIGNED-UUID"
+        )
+        XCTAssertEqual(
+            TapGain.aggregateTapUID(assigned: nil, hardware: "hardware-uid"),
+            "hardware-uid"
+        )
+        XCTAssertEqual(
+            TapGain.aggregateTapUID(assigned: "   ", hardware: "hardware-uid"),
+            "hardware-uid"
+        )
+        XCTAssertNil(TapGain.aggregateTapUID(assigned: nil, hardware: nil))
+        XCTAssertNil(TapGain.aggregateTapUID(assigned: "", hardware: "  "))
+    }
+
+    func testCaptureAggregateHasNoOutputSubdevice() {
+        let spec = TapGain.CaptureAggregateSpec(
+            name: "QuietNeighbor com.apple.Music",
+            aggregateUID: "com.lonnylot.QuietNeighbor.agg.test",
+            tapUID: "ASSIGNED-UUID"
+        )
+        XCTAssertFalse(spec.includesOutputSubdevice)
+        XCTAssertFalse(spec.isStacked)
+        XCTAssertTrue(spec.isPrivate)
+        XCTAssertTrue(spec.tapAutoStart)
+
+        let dictionary = spec.asDictionary()
+        XCTAssertEqual(dictionary[kAudioAggregateDeviceIsStackedKey] as? Bool, false)
+        XCTAssertEqual(dictionary[kAudioAggregateDeviceIsPrivateKey] as? Bool, true)
+        XCTAssertNil(dictionary[kAudioAggregateDeviceMainSubDeviceKey])
+        XCTAssertNil(dictionary[kAudioAggregateDeviceClockDeviceKey])
+        XCTAssertEqual(dictionary[kAudioAggregateDeviceTapAutoStartKey] as? Bool, true)
+        let subdevices = dictionary[kAudioAggregateDeviceSubDeviceListKey] as? [[String: Any]]
+        XCTAssertEqual(subdevices?.count, 0)
+
+        let taps = dictionary[kAudioAggregateDeviceTapListKey] as? [[String: Any]]
+        XCTAssertEqual(taps?.count, 1)
+        XCTAssertEqual(taps?.first?[kAudioSubTapUIDKey] as? String, "ASSIGNED-UUID")
+        XCTAssertEqual(taps?.first?[kAudioSubTapDriftCompensationKey] as? Bool, true)
+    }
+
+    func testDeviceAliveFlag() {
+        XCTAssertTrue(TapGain.isDeviceAlive(1))
+        XCTAssertFalse(TapGain.isDeviceAlive(0))
+        XCTAssertFalse(TapGain.isDeviceAlive(2))
+    }
+
+    func testHalfGainInterleavedTapToNonInterleavedOutput() {
+        let input = TempABL.interleaved([1, 0.4, -1, 0.8], channels: 2)
+        let output = TempABL.nonInterleaved([[9, 9], [9, 9]])
+        defer {
+            input.free()
+            output.free()
+        }
+
+        TapGain.mix(input: input.list, output: output.list, gain: 0.5, inputBufferOffset: 0)
+
+        XCTAssertEqual(output.samples(buffer: 0, count: 2), [0.5, -0.5])
+        XCTAssertEqual(output.samples(buffer: 1, count: 2), [0.2, 0.4])
+    }
+
+    func testFlattenAndApplyIsThePlaybackPathAndStaysAudible() {
+        let input = TempABL.interleaved([1, 0.4, -1, 0.8], channels: 2)
+        let output = TempABL.nonInterleaved([[9, 9], [9, 9]])
+        defer {
+            input.free()
+            output.free()
+        }
+
+        var interleaved = [Float32](repeating: 0, count: 4)
+        let frames = interleaved.withUnsafeMutableBufferPointer { buffer in
+            TapGain.flattenToInterleavedStereo(
+                input: input.list,
+                into: buffer.baseAddress!,
+                maxFrames: 2
+            )
+        }
+        XCTAssertEqual(frames, 2)
+        XCTAssertEqual(Array(interleaved), [1, 0.4, -1, 0.8])
+
+        let gain = TapGain.ioCommand(for: VolumePreference(volume: 0.5, isMuted: false)).gain
+        XCTAssertEqual(gain, 0.5, accuracy: 0.0001)
+        interleaved.withUnsafeBufferPointer { buffer in
+            TapGain.applyInterleavedStereo(
+                buffer.baseAddress!,
+                frames: frames,
+                gain: gain,
+                to: output.list
+            )
+        }
+        XCTAssertEqual(output.samples(buffer: 0, count: 2), [0.5, -0.5])
+        XCTAssertEqual(output.samples(buffer: 1, count: 2), [0.2, 0.4])
+    }
+
+    func testRingThenApplyHalfGainIsNotSilence() {
+        let ring = TapRingBuffer.allocate(sampleCapacity: 32)
+        defer { ring.deallocate() }
+
+        let captured: [Float32] = [1, -1, 0.5, 0.25]
+        captured.withUnsafeBufferPointer { buffer in
+            XCTAssertEqual(ring.write(from: buffer.baseAddress!, count: 4), 4)
+        }
+
+        var scratch = [Float32](repeating: 99, count: 4)
+        let read = scratch.withUnsafeMutableBufferPointer { buffer in
+            ring.read(into: buffer.baseAddress!, count: 4)
+        }
+        XCTAssertEqual(read, 4)
+        XCTAssertEqual(scratch, captured)
+
+        let output = TempABL.nonInterleaved([[0, 0], [0, 0]])
+        defer { output.free() }
+        scratch.withUnsafeBufferPointer { buffer in
+            TapGain.applyInterleavedStereo(
+                buffer.baseAddress!,
+                frames: 2,
+                gain: 0.5,
+                to: output.list
+            )
+        }
+        XCTAssertEqual(output.samples(buffer: 0, count: 2), [0.5, 0.25])
+        XCTAssertEqual(output.samples(buffer: 1, count: 2), [-0.5, 0.125])
+        XCTAssertFalse(output.samples(buffer: 0, count: 2).allSatisfy { $0 == 0 })
+    }
+
+    func testPartialGainPipelineFromPreferenceIsAudibleNotSilent() {
+        let preference = VolumePreference(volume: 0.5, isMuted: false)
+        let gain = TapGain.ioCommand(for: preference).gain
+        XCTAssertGreaterThan(gain, 0)
+
+        let input = TempABL.nonInterleaved([[1, -0.5], [0.8, 0.2]])
+        let output = TempABL.nonInterleaved([[0, 0], [0, 0]])
+        defer {
+            input.free()
+            output.free()
+        }
+
+        TapGain.mix(input: input.list, output: output.list, gain: gain, inputBufferOffset: 0)
+
+        XCTAssertEqual(output.samples(buffer: 0, count: 2), [0.5, -0.25])
+        XCTAssertEqual(output.samples(buffer: 1, count: 2), [0.4, 0.1])
+        XCTAssertFalse(
+            output.samples(buffer: 0, count: 2).allSatisfy { $0 == 0 }
+                && output.samples(buffer: 1, count: 2).allSatisfy { $0 == 0 },
+            "Partial slider must write scaled samples, not silence"
+        )
+    }
 }
 
 /// Heap `AudioBufferList` for gain tests. Mirrors HAL interleaved (1 buffer, N

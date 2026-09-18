@@ -55,7 +55,7 @@ struct MixerView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(permissionTitle)
                 .font(.system(size: 12, weight: .semibold))
-            Text("macOS treats process taps as audio capture. QuietNeighbor uses them only to apply per-app gain, then plays through your current output device.")
+            Text("macOS treats process taps as audio capture. Allow Microphone and, on 14.4+, System Audio Recording (Privacy → Screen & System Audio Recording). Without the second grant the tap is silent — the slider looks like mute.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

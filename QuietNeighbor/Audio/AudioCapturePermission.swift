@@ -36,6 +36,7 @@ enum AudioCapturePermission {
     static func openSystemSettings() {
         let candidates = [
             "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AudioCapture",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
         ]
         for string in candidates {

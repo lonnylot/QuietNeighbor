@@ -52,4 +52,14 @@ final class VolumePreferenceTests: XCTestCase {
         XCTAssertEqual(VolumePreference(volume: -0.2, isMuted: false).clampedVolume, 0)
         XCTAssertEqual(VolumePreference(volume: 1.4, isMuted: false).effectiveGain, 1)
     }
+
+    func testNeedsTapDoesNotMeanMute() {
+        let preference = VolumePreference(volume: 0.25, isMuted: false)
+        XCTAssertTrue(preference.needsTap)
+        XCTAssertFalse(preference.isMuted)
+        XCTAssertEqual(preference.effectiveGain, 0.25, accuracy: 0.0001)
+        let command = TapGain.ioCommand(for: preference)
+        XCTAssertFalse(command.muted)
+        XCTAssertEqual(command.gain, 0.25, accuracy: 0.0001)
+    }
 }
