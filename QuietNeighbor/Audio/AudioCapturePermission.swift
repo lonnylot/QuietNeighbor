@@ -33,17 +33,24 @@ enum AudioCapturePermission {
         return status
     }
 
-    static func openSystemSettings() {
-        let candidates = [
-            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AudioCapture",
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
-        ]
-        for string in candidates {
+    /// Screen & System Audio Recording first. An unauthorized process tap
+    /// returns silence with no error — same symptom as “slider below 100% mutes.”
+    static let systemAudioRecordingSettingsURLs = [
+        "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AudioCapture",
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+    ]
+
+    static func openSystemAudioRecordingSettings() {
+        for string in systemAudioRecordingSettingsURLs {
             if let url = URL(string: string) {
                 NSWorkspace.shared.open(url)
                 return
             }
         }
+    }
+
+    static func openSystemSettings() {
+        openSystemAudioRecordingSettings()
     }
 }

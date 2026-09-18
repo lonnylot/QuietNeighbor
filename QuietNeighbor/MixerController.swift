@@ -8,6 +8,8 @@ final class MixerController: ObservableObject {
     @Published private(set) var apps: [AudioApp] = []
     @Published private(set) var permission: AudioCaptureAuthorization = AudioCapturePermission.status
     @Published private(set) var defaultOutputUID: String?
+    /// Tap is running but delivering zeros — almost always missing System Audio Recording.
+    @Published private(set) var systemAudioRecordingMissing = false
     @Published var lastError: String?
 
     let store = VolumeStore()
@@ -29,6 +31,7 @@ final class MixerController: ObservableObject {
         engine.setOnSettled { [weak self] in
             Task { @MainActor in
                 self?.publishApps()
+                self?.evaluateCaptureHealth()
             }
         }
 
@@ -44,9 +47,10 @@ final class MixerController: ObservableObject {
         }
         monitor.start()
 
-        outputPoller = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        outputPoller = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshOutputDevice()
+                self?.evaluateCaptureHealth()
             }
         }
     }
@@ -56,6 +60,7 @@ final class MixerController: ObservableObject {
         outputPoller = nil
         monitor.stop()
         engine.stopAll()
+        systemAudioRecordingMissing = false
         didStart = false
     }
 
@@ -78,10 +83,19 @@ final class MixerController: ObservableObject {
         if permission.allowsTaps {
             lastError = nil
         }
+        if systemAudioRecordingMissing {
+            engine.stopAll()
+            systemAudioRecordingMissing = false
+        }
         refreshOutputDevice()
         monitor.refresh()
         syncEngine()
         publishApps()
+        evaluateCaptureHealth()
+    }
+
+    func openSystemAudioRecordingSettings() {
+        AudioCapturePermission.openSystemAudioRecordingSettings()
     }
 
     private func applyChange(for key: String) {
@@ -109,10 +123,10 @@ final class MixerController: ObservableObject {
                 lastError = nil
                 syncEngine()
             } else if status == .denied {
-                lastError = "Audio capture is denied. QuietNeighbor cannot change per-app volume until it is allowed in Privacy settings."
+                lastError = "Audio capture is denied. Allow Microphone and Screen & System Audio Recording in Privacy settings."
                 engine.stopAll()
             } else {
-                lastError = "Allow audio capture to apply per-app volume."
+                lastError = "Allow Microphone and Screen & System Audio Recording to apply per-app volume."
             }
             publishApps()
         }
@@ -185,6 +199,27 @@ final class MixerController: ObservableObject {
         }
 
         apps = rows
+        evaluateCaptureHealth()
+    }
+
+    private func evaluateCaptureHealth() {
+        var missing = false
+        for identity in identities {
+            let preference = store.preference(for: identity.persistenceKey)
+            guard let snapshot = engine.captureSnapshot(for: identity.persistenceKey) else {
+                continue
+            }
+            if TapGain.CaptureHealth.looksUnauthorized(
+                capturedPeak: snapshot.peak,
+                runningFor: snapshot.runningFor,
+                isPlaying: identity.isPlaying,
+                preference: preference
+            ) {
+                missing = true
+                break
+            }
+        }
+        systemAudioRecordingMissing = missing
     }
 
     private func rowError(for identity: ResolvedAppIdentity, preference: VolumePreference) -> String? {
@@ -200,6 +235,15 @@ final class MixerController: ObservableObject {
         case .authorized:
             if identity.processObjectIDs.isEmpty {
                 return "This app is not producing audio right now."
+            }
+            if let snapshot = engine.captureSnapshot(for: identity.persistenceKey),
+               TapGain.CaptureHealth.looksUnauthorized(
+                capturedPeak: snapshot.peak,
+                runningFor: snapshot.runningFor,
+                isPlaying: identity.isPlaying,
+                preference: preference
+               ) {
+                return "System Audio Recording is off. This is silence, not mute."
             }
             return nil
         }

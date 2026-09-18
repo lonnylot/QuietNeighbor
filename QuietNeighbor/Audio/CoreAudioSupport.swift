@@ -148,41 +148,6 @@ enum SystemAudio {
         try AudioProperty.readArray(.system, kAudioHardwarePropertyProcessObjectList)
     }
 
-    static func inputBufferCount(for device: AudioObjectID) -> Int {
-        var property = AudioProperty.address(
-            kAudioDevicePropertyStreamConfiguration,
-            scope: kAudioObjectPropertyScopeInput
-        )
-        var size: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(device, &property, 0, nil, &size) == noErr, size > 0 else {
-            return 0
-        }
-        let raw = UnsafeMutableRawPointer.allocate(
-            byteCount: Int(size),
-            alignment: MemoryLayout<AudioBufferList>.alignment
-        )
-        defer { raw.deallocate() }
-        guard AudioObjectGetPropertyData(device, &property, 0, nil, &size, raw) == noErr else {
-            return 0
-        }
-        return Int(raw.assumingMemoryBound(to: AudioBufferList.self).pointee.mNumberBuffers)
-    }
-
-    static func virtualFormat(
-        device: AudioObjectID,
-        scope: AudioObjectPropertyScope
-    ) throws -> AudioStreamBasicDescription {
-        let streams: [AudioObjectID] = try AudioProperty.readArray(
-            device,
-            kAudioDevicePropertyStreams,
-            scope: scope
-        )
-        guard let stream = streams.first else {
-            throw CoreAudioError.invalidObject("Device has no streams for scope \(scope)")
-        }
-        return try AudioProperty.read(stream, kAudioStreamPropertyVirtualFormat)
-    }
-
     static func nominalSampleRate(of device: AudioObjectID) throws -> Double {
         try AudioProperty.read(device, kAudioDevicePropertyNominalSampleRate)
     }
@@ -211,8 +176,8 @@ enum SystemAudio {
         return status == noErr && TapGain.isDeviceAlive(alive)
     }
 
-    /// Tap-only capture aggregates can take a beat to come up. Starting IO
-    /// before `DeviceIsAlive` yields empty buffers (no error).
+    /// Tap-only capture aggregates can take a moment to come up. Starting IO
+    /// before `DeviceIsAlive` yields empty buffers with no error.
     static func waitUntilAlive(
         _ device: AudioObjectID,
         attempts: Int = 25,
@@ -246,9 +211,5 @@ extension AudioStreamBasicDescription {
         mFormatID == kAudioFormatLinearPCM
             && (mFormatFlags & kAudioFormatFlagIsFloat) != 0
             && mBitsPerChannel == 32
-    }
-
-    var isNonInterleaved: Bool {
-        (mFormatFlags & kAudioFormatFlagIsNonInterleaved) != 0
     }
 }
